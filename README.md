@@ -1,6 +1,6 @@
 # pixelstrip-websocket
 
-** LED pixel strip controlled over internet available websocket API based on ESP32 **
+**LED pixel strip controlled over internet available websocket API based on ESP32**
 
 Send LED pixel strip state as a table (number of pixels * 3 RGB channels) over the internet available websocket. Thanks to that you can integrate LED pixel strips with other systems in very easy way. Sample application could be:
 
