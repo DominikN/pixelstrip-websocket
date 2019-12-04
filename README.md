@@ -65,7 +65,7 @@ To run the project, open Arduino IDE and follow these steps:
 - modify lines 19 - 26 to add your Wi-Fi network credentials
 - upload project to your ESP32 board.
 
-**C. PYTHON SCRIPT: **
+**C. PYTHON SCRIPT:**
 
 **1. Add your laptop/server/RaspberryPi to the same VPN network as ESP32 :**
 
