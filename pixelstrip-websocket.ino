@@ -42,7 +42,7 @@ const char* husarnetJoinCode = "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/yyyyyyyy
 double Setpoint, Input, Output;
 
 //Specify the links and initial tuning parameters
-PID myPID(&Input, &Output, &Setpoint, 1.0, 0.2, 0.0, DIRECT);
+PID myPID(&Input, &Output, &Setpoint, 2.0, 0.5, 0.0, DIRECT);
 
 typedef struct {
   uint8_t pixel[3 * NUMPIXELS];
@@ -56,8 +56,6 @@ WiFiMulti wifiMulti;
 
 void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   LedStripState ledstrip;
-
-  Serial.printf("%d\r\n", (uint32_t)type);
 
   switch (type) {
     case WStype_DISCONNECTED: {
