@@ -163,6 +163,7 @@ void taskDisplay( void * parameter ) {
 
     Input = uxQueueMessagesWaiting(queue);
     myPID.Compute();
+	myPID.SetSampleTime(int(Output));
 
     Serial.printf("%d;%f\r\n", uxQueueMessagesWaiting(queue), Output);
     delay(int(Output));
