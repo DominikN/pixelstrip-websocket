@@ -42,7 +42,7 @@ def rainbow():
 	
 	return strip
 	
-async def pixelStripDisplay():
+async def mainfunc():
 	uri = "ws://pixelstrip:8001"
 	async with websockets.connect(uri) as websocket:
 		a = rainbow()
@@ -57,5 +57,8 @@ async def pixelStripDisplay():
 			
 			await websocket.send(a.tobytes())
 			await asyncio.sleep(0.05)
-
-asyncio.get_event_loop().run_until_complete(pixelStripDisplay())
+			
+try:
+	asyncio.get_event_loop().run_until_complete(mainfunc())
+except KeyboardInterrupt:
+    print("\r\nReceived exit, exiting")
