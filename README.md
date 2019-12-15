@@ -94,3 +94,33 @@ At this stage your ESP32 and your laptop are in the same VLAN network.
 ```py display```
 
 After a while you should see a rainbow theme displayed on the LED pixel strip.
+
+TROUBLESHOOTING
+
+If ESP32 doesn't work and you see similar error:
+
+I (1559) wifi: wifi firmware version: 224c254
+I (1559) wifi: config NVS flash: enabled
+I (1563) wifi: config nano formating: disabled
+W (1570) wifi: wifi_nvs_set fail, index=3 ret=4357
+
+It may mean that you stored to much data in NVS memory. To deal with that install esptool - https://github.com/espressif/esptool .
+
+py -m pip install esptool
+cd C:\Users\usr1\AppData\Local\Programs\Python\Python38-32\Lib\site-packages
+py esptool.py --chip esp32 --port com3 erase_flash
+
+To increase a NVS partition, edit C:\Users\domin\OneDrive\Dokumenty\ArduinoData\packages\esp32-husarnet\hardware\esp32\1.0.5\tools\partitions\default.csv
+
+file. For more information visit that site: https://github.com/espressif/arduino-esp32/issues/703 .
+
+Change  esp32-husarnet\hardware\esp32\1.0.5\tools\partitions\default.csv partiton table to:
+
+# Name,   Type, SubType, Offset,  Size, Flags
+spiffs,      data, spiffs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x140000,
+app1,     app,  ota_1,   0x150000,0x140000,
+eeprom,   data, 0x99,    0x290000,0x1000,
+nvs,   data, nvs,  0x291000,0x16F000,
+

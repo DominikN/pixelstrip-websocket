@@ -6,12 +6,13 @@ import websockets
 import numpy as np 
 import sys
 import argparse
+import json
 
 import matplotlib.pyplot as plt
 
 from array import *
 
-NUMPIXELS = 60
+NUMPIXELS = 150
 
 def cmap_tab():
 	cmap = plt.get_cmap(args.theme)
@@ -33,29 +34,35 @@ def cmap_tab():
 	tab = np.concatenate((tab, tab2), axis=0)
 	
 	# delete NUMPIXEL+1'st pixel
-	tab = np.delete(tab, [0,1,2], 0)
+	# tab = np.delete(tab, [0,1,2], 0)
 	
 	return tab
 
 async def mainfunc():
 	uri = "ws://pixelstrip:8001"
 	async with websockets.connect(uri) as websocket:
-		a = cmap_tab()
+		settings = json.dumps({"mode":"sequence", "numpixel":NUMPIXELS, "buffer":NUMPIXELS, "delay":args.delay})
+		print(settings)
+		await websocket.send(settings)
 		
+		a = cmap_tab()
+	
 		print("pixel table:")
 		print(a)
-		print()
-		print("loop:")
+		print("programming sequence: ")
 		
-		while True:
+		for x in range(NUMPIXELS):	
+			await websocket.send(a.tobytes())
+			await asyncio.sleep(0.05)
+			
 			a = np.roll(a,3)
 			
 			sys.stdout.write('.')
 			sys.stdout.flush()
+		
+		print("done")
+		
 			
-			await websocket.send(a.tobytes())
-			await asyncio.sleep(args.delay)
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("theme", nargs='?', default="autumn", help="Theme to be displayed on a pixel strip. Available themes are listed here: https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html . Default = autumn")

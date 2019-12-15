@@ -6,10 +6,11 @@ import asyncio
 import websockets
 import numpy as np 
 import sys
+import json
 
 from array import *
 
-NUMPIXELS = 60
+NUMPIXELS = 150
 
 def rainbow():
 	k = 0
@@ -42,21 +43,42 @@ def rainbow():
 	
 	return strip
 	
+def oneblink():
+	i = 0
+	strip = np.array(np.zeros((150,3)), dtype=np.uint8)
+	
+	for i in range(150):
+		strip[i][0] = 1
+		strip[i][1] = 1
+		strip[i][2] = 1
+			
+	strip[0][0] = 0
+	strip[0][1] = 25
+	strip[0][2] = 0
+	
+	return strip
+	
 async def mainfunc():
 	uri = "ws://pixelstrip:8001"
 	async with websockets.connect(uri) as websocket:
+		settings = json.dumps({"mode":"sequence", "numpixel":50, "buffer":50, "delay":100})
+		# settings = json.dumps({"mode":"auto", "numpixel":150, "buffer":150, "delay":-1})
+		print(settings)
+		await websocket.send(settings)
+		
 		a = rainbow()
+		# a = oneblink()
 		a = a.flatten()
 		print(a)
-		
+		await asyncio.sleep(0.2)
 		while True:
 			a = np.roll(a,3)
 			
 			sys.stdout.write('.')
 			sys.stdout.flush()
 			
+			await asyncio.sleep(0.1)
 			await websocket.send(a.tobytes())
-			await asyncio.sleep(0.05)
 			
 try:
 	asyncio.get_event_loop().run_until_complete(mainfunc())
