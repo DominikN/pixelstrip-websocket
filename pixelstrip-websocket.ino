@@ -28,6 +28,7 @@ const char* passwordTab[NUM_NETWORKS] = {
   "pass-2",
 };
 
+
 // Husarnet credentials
 const char* hostName = "pixelstrip";  //this will be the name of the 1st ESP32 device at https://app.husarnet.com
 
@@ -72,6 +73,7 @@ bool recording = false;
 
 void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
   LedStripState ledstrip;
+  static uint8_t cnt = 0;
 
   switch (type) {
     case WStype_DISCONNECTED: {
@@ -98,6 +100,7 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
               xQueueReset(queue);
               if (mode_l == "sequence") {
                 recording = true;
+                cnt = 0;
               } else {
                 recording = false;
               }
@@ -115,9 +118,12 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
           }
           if (jsonDocumentSettings.containsKey("buffer")) {
             int n = jsonDocumentSettings["buffer"];
-            if ((n > 0) && (n < MAXBUFSIZE + 1)) {
-              buffer_s = n;
+   
+            if ((n > MAXBUFSIZE) && (mode_s == "auto")) {
+              buffer_s = MAXBUFSIZE;
               Setpoint = buffer_s / 2;
+            } else {
+              buffer_s = n;
             }
           }
           if (jsonDocumentSettings.containsKey("delay")) {
@@ -153,25 +159,20 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
         }
 
         if ((recording == true) && (mode_s == "sequence")) {
-          Serial.printf("%d ", uxQueueMessagesWaiting(queue));
-          xQueueSendToBack(queue, (void*)&ledstrip, 0);
+          String key = String("sFrame" + String(cnt) + "x");
 
-          if (uxQueueMessagesWaiting(queue) >= buffer_s) {
-            Serial.printf("\r\nWriting frames to NVM (%d x %d) ... ", numpixel_s, buffer_s);
+          preferences.begin("my-app", false);
+          preferences.putBytes(key.c_str(), (void*)&ledstrip, sizeof(ledstrip));
+          preferences.end();
 
-            preferences.begin("my-app", false);
-            for (int i = 0; i < buffer_s; i++) {
-              String key = String("strip_frames_" + String(i));
-
-              xQueueReceive(queue, (void*)&ledstrip, portMAX_DELAY );
-              preferences.putBytes(key.c_str(), (const void*)&ledstrip, sizeof(ledstrip));
-              xQueueSendToBack(queue, (void*)&ledstrip, 0);
-            }
+          Serial.printf("nvm write: %s\r\n", key.c_str());
+          
+          cnt++;
+          if (cnt >= buffer_s) {
             recording = false;
-            preferences.end();
-
-            Serial.printf("done\r\n");
+            Serial.printf("\r\n(%d x %d) frames written to NVM\r\n", numpixel_s, buffer_s);
           }
+
         }
       }
       break;
@@ -221,26 +222,13 @@ void setup() {
     numpixel_s = MAXNUMPIXELS;
   }
   buffer_s = preferences.getInt("strip_buffer");
-  if (buffer_s > MAXBUFSIZE) {
+  if ((buffer_s > MAXBUFSIZE) && (mode_s == "auto") ) {
     buffer_s = MAXBUFSIZE;
   }
 
   delay_s = preferences.getInt("strip_delay");
 
   Serial.printf("\r\nPixel Strip settings:\r\nmode = %s\r\nnumpixel = %d\r\nbuffer = %d\r\ndelay = %d\r\n", mode_s.c_str(), numpixel_s, buffer_s,  delay_s);
-
-  if (mode_s == "sequence") {
-    LedStripState ledstrip;
-
-    Serial.printf("\r\nLoading frames from NVM (%d x %d) ... ", numpixel_s, buffer_s);
-    for (int i = 0; i < buffer_s; i++) {
-      String key = String("strip_frames_" + String(i));
-      preferences.getBytes(key.c_str(), (void*)&ledstrip, sizeof(ledstrip));
-      xQueueSendToBack(queue, (void*)&ledstrip, 0);
-    }
-    Serial.printf("done\r\n");
-  }
-
   preferences.end();
 
 
@@ -280,6 +268,8 @@ void taskDisplay( void * parameter ) {
   uint8_t green = 0;
   uint8_t blue = 0;
 
+  uint8_t cnt = 0;
+
   while (1) {
     if (mode_s == "auto") {
       xQueueReceive(queue, (void*)&ls, portMAX_DELAY );
@@ -300,8 +290,13 @@ void taskDisplay( void * parameter ) {
       delay(int(Output));
     } else {
       if (mode_s == "sequence" && recording == false) {
-        xQueueReceive(queue, (void*)&ls, portMAX_DELAY );
-        xQueueSendToBack(queue, (void*)&ls, 0);
+        String key = String("sFrame" + String(cnt) + "x");
+
+        Serial.printf("nvm read: %s, %d\r\n", key.c_str(), delay_s);
+
+        preferences.begin("my-app", false);
+        preferences.getBytes(key.c_str(), (void*)&ls, sizeof(ls));
+        preferences.end();
 
         for (int i = 0; i < numpixel_s; i++) {
           red = ls.pixel[3 * i + 0];
@@ -309,9 +304,14 @@ void taskDisplay( void * parameter ) {
           blue = ls.pixel[3 * i + 2];
           strip.SetPixelColor(i, RgbColor(red, green, blue));
         }
+
         strip.Show();
 
-        Serial.printf("%d;%d\r\n", uxQueueMessagesWaiting(queue), delay_s);
+        cnt++;
+        if (cnt >= buffer_s) {
+          cnt = 0;
+        }
+        
         delay(delay_s);
       } else {
         delay(10);
@@ -322,20 +322,20 @@ void taskDisplay( void * parameter ) {
 
 void taskWifi( void * parameter ) {
   uint8_t stat = WL_DISCONNECTED;
-  
+
   /* Add Wi-Fi network credentials */
   for (int i = 0; i < NUM_NETWORKS; i++) {
     wifiMulti.addAP(ssidTab[i], passwordTab[i]);
     Serial.printf("WiFi %d: SSID: \"%s\" ; PASS: \"%s\"\r\n", i, ssidTab[i], passwordTab[i]);
   }
-  
-  while(stat != WL_CONNECTED) {
+
+  while (stat != WL_CONNECTED) {
     stat = wifiMulti.run();
     Serial.printf("WiFi status: %d\r\n", (int)stat);
-    delay(100); 
+    delay(100);
   }
   Serial.printf("WiFi connected\r\n", (int)stat);
- 
+
   Husarnet.join(husarnetJoinCode, hostName);
   Husarnet.start();
 
@@ -343,13 +343,13 @@ void taskWifi( void * parameter ) {
   webSocket.onEvent(onWebSocketEvent);
 
   while (1) {
-      while (WiFi.status() == WL_CONNECTED) {
-        webSocket.loop();
-        xSemaphoreTake(sem, ( TickType_t)10);
-      }
-      Serial.printf("WiFi disconnected, reconnecting\r\n");
-      stat = wifiMulti.run();
-      Serial.printf("WiFi status: %d\r\n", (int)stat);
+    while (WiFi.status() == WL_CONNECTED) {
+      webSocket.loop();
+      xSemaphoreTake(sem, ( TickType_t)10);
+    }
+    Serial.printf("WiFi disconnected, reconnecting\r\n");
+    stat = wifiMulti.run();
+    Serial.printf("WiFi status: %d\r\n", (int)stat);
   }
 }
 
