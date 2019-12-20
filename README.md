@@ -4,10 +4,10 @@
 
 Send LED pixel strip state as a table (number of pixels * 3 RGB channels) over the internet available websocket. Thanks to that you can integrate LED pixel strips with other systems in very easy way. Sample application could be:
 
-a) make light FFT efect to a music played on your laptop
-b) smart TV backlight
-c) connecting ledstrip with a movement sensor in your lobby
-d) make a cool light decoration for your christmas tree that interacts with environment (eg. if someones enters room)
+* make light FFT efect to a music played on your laptop
+* smart TV backlight
+* connecting ledstrip with a movement sensor in your lobby
+* make a cool light decoration for your christmas tree that interacts with environment (eg. if someones enters room)
 
 Running the project is straightforward. Just follow these steps:
 
@@ -46,6 +46,15 @@ To run the project, open Arduino IDE and follow these steps:
 - open `Sketch -> Include Library -> Add .ZIP Library ... `
 - choose `arduinoWebSockets-master.zip` file that you just downloaded and click open button
 
+Modify this library a little bit:
+- open **WebSockets.h** file
+- modify lines:
+```
+#define WEBSOCKETS_MAX_DATA_SIZE  (30*1024) // (15*1024) CHANGE!
+...
+#define WEBSOCKETS_TCP_TIMEOUT    (20000) // (2000) CHANGE!
+```
+
 **4. Install NeoPixelBus library:**
 
 - open `Tools -> Manage Libraries`
@@ -61,8 +70,8 @@ To run the project, open Arduino IDE and follow these steps:
 **6. Program ESP32 board:**
 
 - Open **ESP32-MPU9250-web-view.ino** project
-- modify line 37 with your Husarnet `join code` (get on https://app.husarnet.com)
-- modify lines 19 - 26 to add your Wi-Fi network credentials
+- modify line 40 with your Husarnet `join code` (get on https://app.husarnet.com)
+- modify lines 21 - 29 to add your Wi-Fi network credentials
 - upload project to your ESP32 board.
 
 **C. PYTHON SCRIPT:**
@@ -75,9 +84,9 @@ type in the Linux terminal:
 - `$ husarnet join XXXXXXXXXXXXXXXXXXXXXXX mylaptop` replace XXX...X with your own `join code`. 
 
 To find your join code:
-a) register at https://app.husarnet.com
-b) create a new network or choose existing one
-c) in the chosen network click **Add element** button and go to "join code" tab
+* register at https://app.husarnet.com
+* create a new network or choose existing one
+* in the chosen network click **Add element** button and go to "join code" tab
 
 At this stage your ESP32 and your laptop are in the same VLAN network.
 
@@ -90,6 +99,8 @@ At this stage your ESP32 and your laptop are in the same VLAN network.
 ```py -m pip install websockets```
 - install `numpy` Python 3 library by typing the Linux terminal:
 ```py -m pip install numpy```
+- install `matplotlib` Python 3 library by typing the Linux terminal:
+```py -m pip install matplotlib```
 - and finally run the script - in the project folder type in the terminal:
 ```py display```
 
@@ -116,6 +127,7 @@ file. For more information visit that site: https://github.com/espressif/arduino
 
 Change  esp32-husarnet\hardware\esp32\1.0.5\tools\partitions\default.csv partiton table to:
 
+```
 # Name,   Type, SubType, Offset,  Size, Flags
 spiffs,      data, spiffs,     0x9000,  0x5000,
 otadata,  data, ota,     0xe000,  0x2000,
@@ -123,4 +135,5 @@ app0,     app,  ota_0,   0x10000, 0x140000,
 app1,     app,  ota_1,   0x150000,0x140000,
 eeprom,   data, 0x99,    0x290000,0x1000,
 nvs,   data, nvs,  0x291000,0x16F000,
+```
 

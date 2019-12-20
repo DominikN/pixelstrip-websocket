@@ -11,9 +11,8 @@
 /* ================ CONFIG SECTION START ==================== */
 #define PIN           12   // Pin connected to PixelStrip
 
-// default NVS partition size 0x5000 -> max buf size about 12
 #define MAXNUMPIXELS  150   // How many NeoPixels are attached to the Arduino?
-#define MAXBUFSIZE    150   // buffer size for storing LED strip state (each NUMPIXELS * 3 size)
+#define MAXBUFSIZE    50   // buffer size for storing LED strip state (each NUMPIXELS * 3 size)
 
 #define WEBSOCKET_PORT 8001
 
@@ -21,12 +20,12 @@
 
 // Add your networks credentials here
 const char* ssidTab[NUM_NETWORKS] = {
-  "WIFI-SSID-1",
-  "WIFI-SSID-2",
+  "ssid-1",
+  "ssid-2",
 };
 const char* passwordTab[NUM_NETWORKS] = {
-  "WIFI-PASS-1",
-  "WIFI-PASS-2",
+  "pass-1",
+  "pass-2",
 };
 
 // Husarnet credentials
@@ -66,15 +65,15 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(MAXNUMPIXELS, PIN);
 WebSocketsServer webSocket = WebSocketsServer(WEBSOCKET_PORT);
 WiFiMulti wifiMulti;
 
-StaticJsonBuffer<200> jsonBufferSettings;
+StaticJsonDocument<200> jsonDocumentSettings;
 
 bool recording = false;
 
 
 void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
-	LedStripState ledstrip;
-	
-	switch (type) {
+  LedStripState ledstrip;
+
+  switch (type) {
     case WStype_DISCONNECTED: {
         Serial.printf("[%u] Disconnected\r\n", num);
       }
@@ -86,15 +85,14 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
       break;
 
     case WStype_TEXT: {
-        *(payload + length) = 0; //make cstring
         Serial.printf("[%s]", (char*)payload);
 
-        jsonBufferSettings.clear();
-        JsonObject& rootSettings = jsonBufferSettings.parseObject(payload);
+        jsonDocumentSettings.clear();
+        auto error = deserializeJson(jsonDocumentSettings, payload);
 
-        if (rootSettings.success()) {
-          if (rootSettings.containsKey("mode")) {
-            String mode_l = rootSettings["mode"];
+        if (!error) {
+          if (jsonDocumentSettings.containsKey("mode")) {
+            String mode_l = jsonDocumentSettings["mode"];
             if ((mode_l == "auto") || (mode_l == "sequence")) {
               mode_s = mode_l;
               xQueueReset(queue);
@@ -104,22 +102,26 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
                 recording = false;
               }
             }
+          } else {
+            Serial.printf("no \"mode\" key\r\n");
           }
-          if (rootSettings.containsKey("numpixel")) {
-            int n = rootSettings["numpixel"];
+          if (jsonDocumentSettings.containsKey("numpixel")) {
+            int n = jsonDocumentSettings["numpixel"];
             if ((n > 0) && (n < MAXNUMPIXELS + 1)) {
               numpixel_s = n;
             }
+          } else {
+            Serial.printf("no \"numpixel\" key\r\n");
           }
-          if (rootSettings.containsKey("buffer")) {
-            int n = rootSettings["buffer"];
+          if (jsonDocumentSettings.containsKey("buffer")) {
+            int n = jsonDocumentSettings["buffer"];
             if ((n > 0) && (n < MAXBUFSIZE + 1)) {
               buffer_s = n;
               Setpoint = buffer_s / 2;
             }
           }
-          if (rootSettings.containsKey("delay")) {
-            delay_s = rootSettings["delay"];
+          if (jsonDocumentSettings.containsKey("delay")) {
+            delay_s = jsonDocumentSettings["delay"];
             if (delay_s < -1)
               delay_s = -1;
           }
@@ -147,6 +149,7 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
 
         if (mode_s == "auto") {
           xQueueSendToBack(queue, (void*)&ledstrip, 0);
+          Serial.printf("RAM: %d", esp_get_free_heap_size());
         }
 
         if ((recording == true) && (mode_s == "sequence")) {
@@ -190,7 +193,7 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
 }
 
 void setup() {
-  Serial.begin(460800);
+  Serial.begin(230400);
 
   Serial.printf("\r\nMAXBUFSIZE = %d\r\nMAXNUMPIXELS = %d\r\n", MAXBUFSIZE, MAXNUMPIXELS);
 
@@ -241,13 +244,6 @@ void setup() {
   preferences.end();
 
 
-  /* Add Wi-Fi network credentials */
-  for (int i = 0; i < NUM_NETWORKS; i++) {
-    wifiMulti.addAP(ssidTab[i], passwordTab[i]);
-    Serial.printf("WiFi %d: SSID: \"%s\" ; PASS: \"%s\"\r\n", i, ssidTab[i], passwordTab[i]);
-  }
-
-
   /* Turn the PID on (for "auto" mode only) */
   myPID.SetOutputLimits(20, 200);
   myPID.SetMode(AUTOMATIC);
@@ -262,18 +258,18 @@ void setup() {
   xTaskCreatePinnedToCore(
     taskWifi,          /* Task function. */
     "taskWifi",        /* String with name of task. */
-    20000,            /* Stack size in bytes. */
+    10000,            /* Stack size in bytes. */
     NULL,             /* Parameter passed as input of the task */
-    1,                /* Priority of the task. */
+    4,                /* Priority of the task. */
     NULL,             /* Task handle. */
-    1);               /* Core where the task should run (z 0 działało) */ 
+    1);               /* Core where the task should run (z 0 działało) */
 
   xTaskCreate(
     taskDisplay,          /* Task function. */
     "taskDisplay",        /* String with name of task. */
-    20000,            /* Stack size in bytes. */
+    10000,            /* Stack size in bytes. */
     NULL,             /* Parameter passed as input of the task */
-    1,                /* Priority of the task. */
+    4,                /* Priority of the task. */
     NULL);             /* Task handle. */
 }
 
@@ -314,6 +310,8 @@ void taskDisplay( void * parameter ) {
           strip.SetPixelColor(i, RgbColor(red, green, blue));
         }
         strip.Show();
+
+        Serial.printf("%d;%d\r\n", uxQueueMessagesWaiting(queue), delay_s);
         delay(delay_s);
       } else {
         delay(10);
@@ -323,23 +321,35 @@ void taskDisplay( void * parameter ) {
 }
 
 void taskWifi( void * parameter ) {
+  uint8_t stat = WL_DISCONNECTED;
+  
+  /* Add Wi-Fi network credentials */
+  for (int i = 0; i < NUM_NETWORKS; i++) {
+    wifiMulti.addAP(ssidTab[i], passwordTab[i]);
+    Serial.printf("WiFi %d: SSID: \"%s\" ; PASS: \"%s\"\r\n", i, ssidTab[i], passwordTab[i]);
+  }
+  
+  while(stat != WL_CONNECTED) {
+    stat = wifiMulti.run();
+    Serial.printf("WiFi status: %d\r\n", (int)stat);
+    delay(100); 
+  }
+  Serial.printf("WiFi connected\r\n", (int)stat);
+ 
+  Husarnet.join(husarnetJoinCode, hostName);
+  Husarnet.start();
+
+  webSocket.begin();
+  webSocket.onEvent(onWebSocketEvent);
+
   while (1) {
-    uint8_t stat = wifiMulti.run();
-    if (stat == WL_CONNECTED) {
-      Husarnet.join(husarnetJoinCode, hostName);
-      Husarnet.start();
-
-      webSocket.begin();
-      webSocket.onEvent(onWebSocketEvent);
-
       while (WiFi.status() == WL_CONNECTED) {
         webSocket.loop();
-        xSemaphoreTake(sem, ( TickType_t)1);
+        xSemaphoreTake(sem, ( TickType_t)10);
       }
-    } else {
-      Serial.printf("WiFi error: %d\r\n", (int)stat);
-      delay(500);
-    }
+      Serial.printf("WiFi disconnected, reconnecting\r\n");
+      stat = wifiMulti.run();
+      Serial.printf("WiFi status: %d\r\n", (int)stat);
   }
 }
 

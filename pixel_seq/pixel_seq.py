@@ -41,7 +41,7 @@ def cmap_tab():
 async def mainfunc():
 	uri = "ws://pixelstrip:8001"
 	async with websockets.connect(uri) as websocket:
-		settings = json.dumps({"mode":"sequence", "numpixel":NUMPIXELS, "buffer":NUMPIXELS, "delay":args.delay})
+		settings = json.dumps({"mode":"sequence", "numpixel":NUMPIXELS, "buffer":NUMPIXELS, "delay":50})
 		print(settings)
 		await websocket.send(settings)
 		
