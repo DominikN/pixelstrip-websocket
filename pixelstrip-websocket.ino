@@ -29,6 +29,7 @@ const char* passwordTab[NUM_NETWORKS] = {
 };
 
 
+
 // Husarnet credentials
 const char* hostName = "pixelstrip";  //this will be the name of the 1st ESP32 device at https://app.husarnet.com
 
@@ -60,6 +61,7 @@ typedef struct {
 
 QueueHandle_t queue;
 SemaphoreHandle_t sem = NULL;
+SemaphoreHandle_t semNVM = NULL;
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(MAXNUMPIXELS, PIN);
 
@@ -118,7 +120,7 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
           }
           if (jsonDocumentSettings.containsKey("buffer")) {
             int n = jsonDocumentSettings["buffer"];
-   
+
             if ((n > MAXBUFSIZE) && (mode_s == "auto")) {
               buffer_s = MAXBUFSIZE;
               Setpoint = buffer_s / 2;
@@ -155,18 +157,23 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
 
         if (mode_s == "auto") {
           xQueueSendToBack(queue, (void*)&ledstrip, 0);
-          Serial.printf("RAM: %d", esp_get_free_heap_size());
+          //Serial.printf("RAM: %d", esp_get_free_heap_size());
         }
 
         if ((recording == true) && (mode_s == "sequence")) {
           String key = String("sFrame" + String(cnt) + "x");
 
-          preferences.begin("my-app", false);
-          preferences.putBytes(key.c_str(), (void*)&ledstrip, sizeof(ledstrip));
-          preferences.end();
+          if (xSemaphoreTake(semNVM, ( TickType_t)1000)) {
+            preferences.begin("my-app", false);
+            preferences.putBytes(key.c_str(), (void*)&ledstrip, sizeof(ledstrip));
+            preferences.end();
+            xSemaphoreGive(semNVM);
+          } else {
+            Serial.printf("NVM error WS\r\n");
+          }
 
           Serial.printf("nvm write: %s\r\n", key.c_str());
-          
+
           cnt++;
           if (cnt >= buffer_s) {
             recording = false;
@@ -207,6 +214,8 @@ void setup() {
   xQueueReset(queue);
 
   sem = xSemaphoreCreateMutex();
+  semNVM = xSemaphoreCreateMutex();
+  xSemaphoreGive(semNVM);
 
   /* Load settings from NV memory */
   preferences.begin("my-app", false);
@@ -279,8 +288,11 @@ void taskDisplay( void * parameter ) {
       myPID.SetSampleTime(int(Output));
 
       for (int i = 0; i < numpixel_s; i++) {
-        red = ls.pixel[3 * i + 0];
-        green = ls.pixel[3 * i + 1];
+        //        red = ls.pixel[3 * i + 0];
+        //        green = ls.pixel[3 * i + 1];
+        green = ls.pixel[3 * i + 0];
+        red = ls.pixel[3 * i + 1];
+
         blue = ls.pixel[3 * i + 2];
         strip.SetPixelColor(i, RgbColor(red, green, blue));
       }
@@ -294,13 +306,21 @@ void taskDisplay( void * parameter ) {
 
         Serial.printf("nvm read: %s, %d\r\n", key.c_str(), delay_s);
 
-        preferences.begin("my-app", false);
-        preferences.getBytes(key.c_str(), (void*)&ls, sizeof(ls));
-        preferences.end();
+        if (xSemaphoreTake(semNVM, ( TickType_t)1000)) {
+          preferences.begin("my-app", false);
+          preferences.getBytes(key.c_str(), (void*)&ls, sizeof(ls));
+          preferences.end();
+          xSemaphoreGive(semNVM);
+        } else {
+          Serial.printf("NVM error loop\r\n");
+        }
 
         for (int i = 0; i < numpixel_s; i++) {
-          red = ls.pixel[3 * i + 0];
-          green = ls.pixel[3 * i + 1];
+//          red = ls.pixel[3 * i + 0];
+//          green = ls.pixel[3 * i + 1];
+          green = ls.pixel[3 * i + 0];
+          red = ls.pixel[3 * i + 1];
+          
           blue = ls.pixel[3 * i + 2];
           strip.SetPixelColor(i, RgbColor(red, green, blue));
         }
@@ -311,7 +331,7 @@ void taskDisplay( void * parameter ) {
         if (cnt >= buffer_s) {
           cnt = 0;
         }
-        
+
         delay(delay_s);
       } else {
         delay(10);

@@ -81,7 +81,8 @@ Modify this library a little bit:
 type in the Linux terminal:
 
 - `$ curl https://install.husarnet.com/install.sh | sudo bash` to install Husarnet.
-- `$ husarnet join XXXXXXXXXXXXXXXXXXXXXXX mylaptop` replace XXX...X with your own `join code`. 
+- `$ systemctl restart husarnet` to restart Husarnet.
+- `$ husarnet join XXXXXXXXXXXXXXXXXXXXXXX mylaptop` to connect your laptop to the Husarnet network. Rreplace XXX...X with your own `join code`. 
 
 To find your join code:
 * register at https://app.husarnet.com

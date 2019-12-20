@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from array import *
 
-NUMPIXELS = 150
+NUMPIXELS = 50
 
 def cmap_tab():
 	cmap = plt.get_cmap(args.theme)
@@ -41,7 +41,7 @@ def cmap_tab():
 async def mainfunc():
 	uri = "ws://pixelstrip:8001"
 	async with websockets.connect(uri) as websocket:
-		settings = json.dumps({"mode":"sequence", "numpixel":NUMPIXELS, "buffer":NUMPIXELS, "delay":50})
+		settings = json.dumps({"mode":"sequence", "numpixel":NUMPIXELS, "buffer":NUMPIXELS, "delay":int(1000*args.delay)})
 		print(settings)
 		await websocket.send(settings)
 		
