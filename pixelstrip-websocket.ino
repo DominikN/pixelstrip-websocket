@@ -356,6 +356,7 @@ void taskWifi( void * parameter ) {
   }
   Serial.printf("WiFi connected\r\n", (int)stat);
 
+  Husarnet.selfHostedSetup("default");
   Husarnet.join(husarnetJoinCode, hostName);
   Husarnet.start();
 
